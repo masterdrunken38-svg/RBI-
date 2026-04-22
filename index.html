@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RBI Grade B — AI Study Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<!-- PDF.js for PDF parsing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- mammoth for DOCX -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<!-- SheetJS for Excel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+:root {
+  --bg:#f7f4ee; --surface:#fff; --surface2:#f0ece2; --border:#e2ddd3; --border2:#ccc8be;
+  --ink:#1a1714; --ink2:#4a4640; --ink3:#8a8580;
+  --rbi:#1a3a6b; --rbi2:#2a5298; --rbi-lt:#e8eef8;
+  --gold:#b8860b; --gold-lt:#fdf6e3;
+  --green:#1a6b3a; --green-lt:#e8f5ee;
+  --red:#8b1a1a; --red-lt:#fbe8e8;
+  --amber:#92600a; --amber-lt:#fef3e0;
+  --font:'IBM Plex Sans',sans-serif;
+  --display:'Playfair Display',serif;
+  --mono:'IBM Plex Mono',monospace;
+  --radius:10px; --shadow:0 2px 16px rgba(26,55,107,.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh;display:flex;flex-direction:column}
+
+/* HEADER */
+.header{background:var(--rbi);color:#fff;padding:0 1.25rem;display:flex;align-items:center;gap:.9rem;height:56px;flex-shrink:0;border-bottom:3px solid var(--gold)}
+.emblem{width:34px;height:34px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.h-title{font-family:var(--display);font-size:1.1rem;line-height:1.2}
+.h-sub{font-size:.6rem;font-family:var(--mono);opacity:.6;letter-spacing:.06em;text-transform:uppercase}
+.h-right{margin-left:auto;display:flex;align-items:center;gap:.75rem}
+.badge{font-family:var(--mono);font-size:.6rem;background:rgba(184,134,11,.25);border:1px solid rgba(184,134,11,.5);color:#ffd770;padding:3px 9px;border-radius:20px;letter-spacing:.04em}
+.notes-pill{font-family:var(--mono);font-size:.6rem;background:rgba(52,107,58,.35);border:1px solid rgba(52,180,100,.4);color:#7dffaa;padding:3px 9px;border-radius:20px;display:none}
+.web-pill{font-family:var(--mono);font-size:.6rem;background:rgba(26,100,184,.3);border:1px solid rgba(80,160,255,.4);color:#90c8ff;padding:3px 9px;border-radius:20px;cursor:pointer;transition:background .15s}
+.web-pill:hover{background:rgba(26,100,184,.5)}
+
+/* NAV */
+.nav{background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;padding:0 .75rem;flex-shrink:0}
+.nav::-webkit-scrollbar{display:none}
+.tab{padding:0 1rem;height:43px;display:flex;align-items:center;gap:5px;font-size:.76rem;font-weight:500;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s;flex-shrink:0}
+.tab:hover{color:var(--rbi)}
+.tab.active{color:var(--rbi);border-bottom-color:var(--rbi)}
+
+/* LAYOUT */
+.main{flex:1;display:flex;overflow:hidden}
+.panel{display:none;flex:1;overflow:hidden;flex-direction:column}
+.panel.active{display:flex}
+
+/* CHAT */
+.chat-wrap{flex:1;overflow-y:auto;padding:1rem .9rem;display:flex;flex-direction:column;gap:.9rem}
+.chat-wrap::-webkit-scrollbar{width:4px}
+.chat-wrap::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.msg{display:flex;gap:9px;animation:fu .25s ease}
+.msg.user{flex-direction:row-reverse}
+@keyframes fu{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.avatar{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}
+.avatar.bot{background:var(--rbi);color:#fff;font-size:11px;font-weight:600}
+.avatar.usr{background:var(--surface2);border:1px solid var(--border);font-size:11px}
+.bubble{max-width:84%;padding:.7rem .95rem;border-radius:12px;font-size:.855rem;line-height:1.7}
+.msg.bot .bubble{background:var(--surface);border:1px solid var(--border);border-top-left-radius:3px;box-shadow:var(--shadow)}
+.msg.user .bubble{background:var(--rbi);color:#fff;border-top-right-radius:3px}
+.bubble strong{font-weight:600}
+.bubble em{color:var(--rbi2);font-style:normal;font-weight:500}
+.bubble ul{padding-left:1.1rem;margin:4px 0}
+.bubble li{margin:3px 0}
+.icard{margin-top:9px;background:var(--rbi-lt);border:1px solid #c8d8f0;border-radius:8px;padding:9px 12px;font-size:.8rem}
+.icard-t{font-weight:600;color:var(--rbi);font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-family:var(--mono)}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:.68rem;font-family:var(--mono);font-weight:500;margin:2px}
+.t-p1{background:var(--rbi-lt);color:var(--rbi);border:1px solid #b0c4e8}
+.t-p2{background:var(--gold-lt);color:var(--gold);border:1px solid #e0c060}
+.t-p3{background:var(--green-lt);color:var(--green);border:1px solid #a0d0b0}
+.t-pyq{background:var(--amber-lt);color:var(--amber);border:1px solid #e0b060}
+.t-imp{background:var(--red-lt);color:var(--red);border:1px solid #e0a0a0}
+.t-gap{background:#fff0f0;color:#8b1a1a;border:1px solid #f0b0b0}
+.t-ok{background:var(--green-lt);color:var(--green);border:1px solid #a0d0b0}
+
+/* INPUT */
+.input-area{padding:.7rem .9rem .9rem;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.qp-row{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px}
+.qp{background:var(--rbi-lt);border:1px solid #c0d0e8;color:var(--rbi2);padding:4px 9px;border-radius:14px;font-size:.68rem;cursor:pointer;transition:all .15s;white-space:nowrap}
+.qp:hover{background:var(--rbi);color:#fff;border-color:var(--rbi)}
+.inp-row{display:flex;gap:7px;align-items:flex-end}
+.inp{flex:1;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 12px;font-family:var(--font);font-size:.865rem;color:var(--ink);resize:none;min-height:40px;max-height:110px;outline:none;transition:border-color .15s}
+.inp:focus{border-color:var(--rbi)}
+.inp::placeholder{color:var(--ink3)}
+.send{width:40px;height:40px;background:var(--rbi);border:none;border-radius:var(--radius);color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s;flex-shrink:0}
+.send:hover{background:var(--rbi2)}
+.send:active{transform:scale(.95)}
+.send:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+/* UPLOAD PANEL */
+.scroll-panel{flex:1;overflow-y:auto;padding:1rem .9rem}
+.scroll-panel::-webkit-scrollbar{width:4px}
+.scroll-panel::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.sec-head{font-family:var(--display);font-size:1rem;color:var(--rbi);margin-bottom:.9rem;padding-bottom:.4rem;border-bottom:2px solid var(--rbi-lt);display:flex;align-items:center;gap:7px}
+
+/* Drop zone */
+.dropzone{border:2px dashed var(--border2);border-radius:14px;padding:2rem 1rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface);margin-bottom:1rem}
+.dropzone:hover,.dropzone.over{border-color:var(--rbi);background:var(--rbi-lt)}
+.dz-icon{font-size:2rem;margin-bottom:.5rem}
+.dz-title{font-weight:600;font-size:.9rem;color:var(--ink2);margin-bottom:.3rem}
+.dz-sub{font-size:.75rem;color:var(--ink3);font-family:var(--mono)}
+.file-input{display:none}
+
+/* File list */
+.file-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.75rem 1rem;margin-bottom:.6rem;display:flex;align-items:center;gap:.75rem;box-shadow:var(--shadow);animation:fu .25s ease}
+.file-icon{font-size:1.4rem;flex-shrink:0}
+.file-info{flex:1}
+.file-name{font-weight:500;font-size:.83rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.file-meta{font-size:.7rem;color:var(--ink3);font-family:var(--mono);margin-top:2px}
+.file-status{font-size:.68rem;font-family:var(--mono);padding:3px 8px;border-radius:5px}
+.fs-processing{background:var(--amber-lt);color:var(--amber)}
+.fs-ready{background:var(--green-lt);color:var(--green)}
+.fs-error{background:var(--red-lt);color:var(--red)}
+.file-del{background:none;border:none;color:var(--ink3);cursor:pointer;font-size:16px;padding:4px;border-radius:5px;transition:color .15s}
+.file-del:hover{color:var(--red)}
+
+/* Analysis cards */
+.analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1rem}
+.a-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.8rem;box-shadow:var(--shadow);cursor:pointer;transition:border-color .2s}
+.a-card:hover{border-color:var(--rbi)}
+.a-card-icon{font-size:1.3rem;margin-bottom:.35rem}
+.a-card-title{font-size:.8rem;font-weight:600;color:var(--ink);margin-bottom:.2rem}
+.a-card-sub{font-size:.7rem;color:var(--ink3)}
+.run-btn{width:100%;background:var(--rbi);color:#fff;border:none;border-radius:var(--radius);padding:.7rem;font-family:var(--font);font-size:.85rem;font-weight:500;cursor:pointer;transition:background .15s;margin-top:.5rem}
+.run-btn:hover{background:var(--rbi2)}
+.run-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* Tracker */
+.tracker-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1rem}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.8rem;box-shadow:var(--shadow)}
+.stat-num{font-family:var(--display);font-size:1.7rem;color:var(--rbi);line-height:1}
+.stat-lbl{font-size:.68rem;color:var(--ink3);margin-top:3px;font-family:var(--mono)}
+.rev-item{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:.65rem .9rem;display:flex;align-items:center;gap:9px;font-size:.8rem;box-shadow:var(--shadow);margin-bottom:6px}
+.rev-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.dot-today{background:var(--red)}.dot-soon{background:var(--amber)}.dot-later{background:var(--green)}
+.rev-topic{flex:1;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.rev-date{font-family:var(--mono);font-size:.68rem;color:var(--ink3)}
+.rev-type{font-size:.63rem;font-family:var(--mono);padding:2px 6px;border-radius:4px}
+.rt-r1{background:var(--green-lt);color:var(--green)}
+.rt-r2{background:var(--rbi-lt);color:var(--rbi)}
+.rt-r3{background:var(--amber-lt);color:var(--amber)}
+.rt-r4{background:var(--red-lt);color:var(--red)}
+.rt-mock{background:var(--gold-lt);color:var(--gold)}
+
+/* Progress */
+.prog-wrap{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:.9rem;margin-bottom:.9rem;box-shadow:var(--shadow)}
+.prog-bg{background:var(--surface2);border-radius:6px;height:7px;overflow:hidden;margin:7px 0 6px}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--rbi),var(--rbi2));border-radius:6px;transition:width .5s ease}
+.prog-stats{display:flex;gap:1rem}
+.pstat{font-family:var(--mono);font-size:.68rem;color:var(--ink3)}
+.pstat strong{color:var(--rbi)}
+
+/* Syllabus */
+.paper-block{background:var(--surface);border:1px solid var(--border);border-radius:11px;margin-bottom:.9rem;overflow:hidden;box-shadow:var(--shadow)}
+.paper-hdr{padding:.65rem .9rem;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--border)}
+.paper-lbl{font-weight:600;font-size:.83rem}
+.paper-meta{font-size:.68rem;font-family:var(--mono);color:var(--ink3);margin-left:auto}
+.t-item{padding:.55rem .9rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;font-size:.8rem;cursor:pointer;transition:background .12s}
+.t-item:last-child{border-bottom:none}
+.t-item:hover{background:var(--bg)}
+.chk{width:17px;height:17px;border:1.5px solid var(--border2);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px;transition:all .15s}
+.chk.done{background:var(--rbi);border-color:var(--rbi);color:#fff}
+.t-name{flex:1}
+.t-imp{font-size:.63rem;font-family:var(--mono);padding:2px 6px;border-radius:4px}
+.hi{background:var(--red-lt);color:var(--red)}.med{background:var(--amber-lt);color:var(--amber)}.lo{background:var(--green-lt);color:var(--green)}
+.t-notes-ind{font-size:.63rem;font-family:var(--mono);color:var(--green);margin-left:2px}
+
+/* Loading */
+.dots span{display:inline-block;width:5px;height:5px;background:var(--ink3);border-radius:50%;margin:0 2px;animation:boing 1.1s infinite}
+.dots span:nth-child(2){animation-delay:.18s}
+.dots span:nth-child(3){animation-delay:.36s}
+@keyframes boing{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+.empty{text-align:center;padding:2rem .9rem;color:var(--ink3);font-size:.78rem;font-family:var(--mono)}
+
+/* Result box */
+.result-box{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:1rem;margin-top:.9rem;box-shadow:var(--shadow);font-size:.82rem;line-height:1.7}
+.result-box h3{font-family:var(--display);font-size:.95rem;color:var(--rbi);margin-bottom:.6rem}
+.gap-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.78rem}
+.gap-item:last-child{border-bottom:none}
+
+/* WEB SEARCH */
+.web-source{display:inline-flex;align-items:center;gap:5px;background:var(--rbi-lt);border:1px solid #c0d4f0;border-radius:6px;padding:3px 9px;font-size:.68rem;font-family:var(--mono);color:var(--rbi2);margin:2px;text-decoration:none;cursor:pointer;transition:background .15s}
+.web-source:hover{background:var(--rbi);color:#fff}
+.web-fetching{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--ink3);font-family:var(--mono);padding:6px 0}
+.news-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.8rem 1rem;margin-bottom:.6rem;box-shadow:var(--shadow);animation:fu .25s ease}
+.news-card-title{font-weight:600;font-size:.83rem;color:var(--ink);margin-bottom:4px}
+.news-card-meta{font-size:.68rem;font-family:var(--mono);color:var(--ink3);margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.news-card-body{font-size:.78rem;color:var(--ink2);line-height:1.6}
+.news-relevance{font-size:.65rem;font-family:var(--mono);padding:2px 7px;border-radius:4px;background:var(--rbi-lt);color:var(--rbi);border:1px solid #b0c4e8}
+.search-toggle{display:flex;align-items:center;gap:6px;font-size:.72rem;color:var(--ink3);cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);transition:all .15s;white-space:nowrap}
+.search-toggle.on{color:var(--rbi);border-color:var(--rbi);background:var(--rbi-lt)}
+.search-toggle input{accent-color:var(--rbi);width:13px;height:13px}
+.feed-section{margin-bottom:1.25rem}
+.feed-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}
+.feed-title{font-size:.78rem;font-weight:600;color:var(--ink2);display:flex;align-items:center;gap:6px}
+.refresh-btn{font-size:.68rem;font-family:var(--mono);color:var(--rbi);cursor:pointer;padding:3px 8px;border-radius:5px;border:1px solid #c0d4f0;background:var(--rbi-lt);transition:all .15s}
+.refresh-btn:hover{background:var(--rbi);color:#fff}
+.web-toggle-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="emblem">₹</div>
+  <div>
+    <div class="h-title">RBI Grade B Assistant</div>
+    <div class="h-sub">Personal AI · Notes-Aware · Phase I &amp; II</div>
+  </div>
+  <div class="h-right">
+    <span class="notes-pill" id="notesPill">📄 0 notes loaded</span>
+    <span class="web-pill" id="webPill" onclick="switchTab('web')" title="Live Web Search Active">🌐 Live</span>
+    <span class="badge">GRADE B OFFICER</span>
+  </div>
+</div>
+
+<nav class="nav">
+  <div class="tab active" data-tab="chat"     onclick="switchTab('chat')">💬 Ask AI</div>
+  <div class="tab"        data-tab="web"    onclick="switchTab('web')">🌐 Live Web</div>
+  <div class="tab"        data-tab="upload"   onclick="switchTab('upload')">📂 My Notes</div>
+  <div class="tab"        data-tab="syllabus" onclick="switchTab('syllabus')">📋 Syllabus</div>
+  <div class="tab"        data-tab="tracker"  onclick="switchTab('tracker')">📅 Revisions</div>
+  <div class="tab"        data-tab="pyq"      onclick="switchTab('pyq')">📝 PYQ</div>
+</nav>
+
+<div class="main">
+
+  <!-- ═══ CHAT ═══ -->
+  <div class="panel active" id="panel-chat">
+    <div class="chat-wrap" id="chatWrap">
+      <div class="msg bot">
+        <div class="avatar bot">RBI</div>
+        <div class="bubble">
+          <strong>Namaste! 🙏 Your personal RBI Grade B AI is ready.</strong><br/><br/>
+          Upload your notes in the <em>📂 My Notes</em> tab and I will answer every question using <em>your material first</em>, then fill gaps with my own knowledge.<br/><br/>
+          I can also:<br/>
+          <ul>
+            <li>🔍 Find patterns in PYQs beyond what you can see manually</li>
+            <li>🕳️ Detect gaps between your notes &amp; the full syllabus</li>
+            <li>📋 Generate revision summaries from your own notes</li>
+            <li>🎯 Create practice questions from your notes</li>
+            <li>📅 Log studied topics → auto-schedule R1→R4→Mock</li>
+          </ul>
+          <br/>Start by uploading your notes, or just ask me anything!
+        </div>
+      </div>
+    </div>
+    <div class="input-area" id="chatInputArea">
+      <div class="web-toggle-row">
+        <label class="search-toggle on" id="webToggle">
+          <input type="checkbox" id="webSearchOn" checked onchange="document.getElementById('webToggle').classList.toggle('on',this.checked)"/>
+          🌐 Web Search
+        </label>
+        <span style="font-size:.68rem;color:var(--ink3);font-family:var(--mono)">ON = searches live RBI/economy data before answering</span>
+      </div>
+      <div class="qp-row">
+        <span class="qp" onclick="askQ('What are the latest RBI policy announcements this month?')">🏦 Latest RBI News</span>
+        <span class="qp" onclick="askQ('What topics in my notes appear most in RBI Grade B PYQs?')">⭐ PYQ Patterns</span>
+        <span class="qp" onclick="askQ('Which important syllabus topics are missing from my notes?')">🕳️ Find Gaps</span>
+        <span class="qp" onclick="askQ('Create 5 practice questions from my notes on Indian Economy')">🎯 Practice Qs</span>
+        <span class="qp" onclick="askQ('What are the current CRR, SLR, Repo Rate values?')">📊 Key Rates</span>
+        <span class="qp" onclick="askQ('I studied RBI Functions and Structure today. Log it.')">✅ Log Topic</span>
+      </div>
+      <div class="inp-row">
+        <textarea class="inp" id="chatInp" placeholder="Ask anything — web search ON means I'll fetch live RBI/economy data…" rows="1"
+          onkeydown="hk(event,'chat')" oninput="ar(this)"></textarea>
+        <button class="send" id="sendBtn" onclick="sendChat()">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ LIVE WEB ═══ -->
+  <div class="panel" id="panel-web">
+    <div class="scroll-panel">
+      <div class="sec-head">🌐 Live Web Intelligence</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1rem">
+        <div class="a-card" onclick="fetchLiveSection('rbi_circulars')">
+          <div class="a-card-icon">🏦</div>
+          <div class="a-card-title">RBI Circulars & Notifications</div>
+          <div class="a-card-sub">Latest policy decisions & press releases</div>
+        </div>
+        <div class="a-card" onclick="fetchLiveSection('current_affairs')">
+          <div class="a-card-icon">📰</div>
+          <div class="a-card-title">Economy Current Affairs</div>
+          <div class="a-card-sub">GDP, inflation, budget news relevant to exam</div>
+        </div>
+        <div class="a-card" onclick="fetchLiveSection('key_rates')">
+          <div class="a-card-icon">📊</div>
+          <div class="a-card-title">Key RBI Rates Today</div>
+          <div class="a-card-sub">Repo, Reverse Repo, CRR, SLR, MSF</div>
+        </div>
+        <div class="a-card" onclick="fetchLiveSection('exam_updates')">
+          <div class="a-card-icon">📋</div>
+          <div class="a-card-title">RBI Grade B Exam Updates</div>
+          <div class="a-card-sub">Notification, dates, syllabus changes 2025</div>
+        </div>
+        <div class="a-card" onclick="fetchLiveSection('banking_news')">
+          <div class="a-card-icon">🏛️</div>
+          <div class="a-card-title">Banking Sector News</div>
+          <div class="a-card-sub">NPA, mergers, regulation changes</div>
+        </div>
+        <div class="a-card" onclick="fetchLiveSection('govt_schemes')">
+          <div class="a-card-icon">🗂️</div>
+          <div class="a-card-title">New Govt Schemes</div>
+          <div class="a-card-sub">Recent launches important for GA section</div>
+        </div>
+      </div>
+
+      <div id="webResults">
+        <div class="empty">Click any card above to fetch live information.<br/>Results are sourced from RBI.org.in, PIB, and trusted news sources.</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="panel-upload">
+    <div class="scroll-panel">
+      <div class="sec-head">📂 Upload Your Study Notes</div>
+
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('fileIn').click()"
+        ondragover="dzOver(event)" ondragleave="dzLeave(event)" ondrop="dzDrop(event)">
+        <div class="dz-icon">📄</div>
+        <div class="dz-title">Drop files here or click to browse</div>
+        <div class="dz-sub">PDF · DOCX · XLSX · Images (JPG/PNG) · TXT</div>
+      </div>
+      <input type="file" id="fileIn" class="file-input" multiple
+        accept=".pdf,.docx,.xlsx,.xls,.txt,.png,.jpg,.jpeg"
+        onchange="handleFiles(this.files)"/>
+
+      <div id="fileList"></div>
+
+      <div class="sec-head" style="margin-top:1.25rem">🔬 Analyse My Notes</div>
+      <div class="analysis-grid">
+        <div class="a-card" onclick="runAnalysis('pyq_pattern')">
+          <div class="a-card-icon">📈</div>
+          <div class="a-card-title">PYQ Pattern Analysis</div>
+          <div class="a-card-sub">Find which of your topics repeat most in past exams</div>
+        </div>
+        <div class="a-card" onclick="runAnalysis('gap_analysis')">
+          <div class="a-card-icon">🕳️</div>
+          <div class="a-card-title">Gap Detection</div>
+          <div class="a-card-sub">Syllabus topics missing from your notes</div>
+        </div>
+        <div class="a-card" onclick="runAnalysis('revision_summary')">
+          <div class="a-card-icon">📋</div>
+          <div class="a-card-title">Revision Summary</div>
+          <div class="a-card-sub">Crisp bullet summaries from your notes</div>
+        </div>
+        <div class="a-card" onclick="runAnalysis('practice_questions')">
+          <div class="a-card-icon">🎯</div>
+          <div class="a-card-title">Generate Questions</div>
+          <div class="a-card-sub">Exam-style questions from your own notes</div>
+        </div>
+      </div>
+
+      <div id="analysisResult"></div>
+    </div>
+  </div>
+
+  <!-- ═══ SYLLABUS ═══ -->
+  <div class="panel" id="panel-syllabus">
+    <div class="scroll-panel">
+      <div class="prog-wrap">
+        <div style="font-size:.78rem;font-weight:600;color:var(--ink2)">Overall Syllabus Coverage</div>
+        <div class="prog-bg"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        <div class="prog-stats">
+          <div class="pstat">Done: <strong id="doneC">0</strong></div>
+          <div class="pstat">Left: <strong id="remC">0</strong></div>
+          <div class="pstat">Coverage: <strong id="covP">0%</strong></div>
+        </div>
+      </div>
+
+      <div class="sec-head">📄 Phase I — Objective</div>
+      <div class="paper-block"><div class="paper-hdr"><span class="tag t-p1">GA</span><span class="paper-lbl">General Awareness</span><span class="paper-meta">80Q · 80M · 25min</span></div><div id="tl-ga"></div></div>
+      <div class="paper-block"><div class="paper-hdr"><span class="tag t-p2">ENG</span><span class="paper-lbl">English</span><span class="paper-meta">30Q · 30M · 25min</span></div><div id="tl-eng"></div></div>
+      <div class="paper-block"><div class="paper-hdr"><span class="tag t-p2">QA</span><span class="paper-lbl">Quantitative Aptitude</span><span class="paper-meta">30Q · 30M · 25min</span></div><div id="tl-quant"></div></div>
+      <div class="paper-block"><div class="paper-hdr"><span class="tag t-p2">RES</span><span class="paper-lbl">Reasoning</span><span class="paper-meta">60Q · 60M · 45min</span></div><div id="tl-reason"></div></div>
+
+      <div class="sec-head" style="margin-top:1.25rem">📄 Phase II — Descriptive</div>
+      <div class="paper-block"><div class="paper-hdr"><span class="tag t-p3">ESI</span><span class="paper-lbl">Economic &amp; Social Issues</span><span class="paper-meta">100M · 3hrs</span></div><div id="tl-esi"></div></div>
+      <div class="paper-block"><div class="paper-hdr"><span class="tag t-p3">ENG2</span><span class="paper-lbl">English Writing</span><span class="paper-meta">100M · 90min</span></div><div id="tl-eng2"></div></div>
+      <div class="paper-block"><div class="paper-hdr"><span class="tag t-p3">F&amp;M</span><span class="paper-lbl">Finance &amp; Management</span><span class="paper-meta">100M · 3hrs</span></div><div id="tl-fm"></div></div>
+    </div>
+  </div>
+
+  <!-- ═══ TRACKER ═══ -->
+  <div class="panel" id="panel-tracker">
+    <div class="scroll-panel">
+      <div class="tracker-grid">
+        <div class="stat-card"><div class="stat-num" id="trTopics">0</div><div class="stat-lbl">Topics Logged</div></div>
+        <div class="stat-card"><div class="stat-num" id="trDue">0</div><div class="stat-lbl">Due This Week</div></div>
+        <div class="stat-card"><div class="stat-num" id="trDone">0</div><div class="stat-lbl">Topics Covered</div></div>
+        <div class="stat-card"><div class="stat-num" id="trMock">0</div><div class="stat-lbl">Mocks Scheduled</div></div>
+      </div>
+      <div class="sec-head">📅 Upcoming Sessions</div>
+      <div id="revList"><div class="empty">No revisions yet.<br/>Say "I studied [topic]" in the chat to schedule!</div></div>
+    </div>
+  </div>
+
+  <!-- ═══ PYQ ═══ -->
+  <div class="panel" id="panel-pyq">
+    <div class="chat-wrap" id="pyqWrap">
+      <div class="msg bot">
+        <div class="avatar bot">RBI</div>
+        <div class="bubble">
+          <strong>PYQ Practice Mode</strong><br/><br/>
+          I'll give you actual RBI Grade B pattern questions with full explanations. When you've uploaded notes, I'll also flag which PYQs relate directly to your material.
+          <div class="icard">
+            <div class="icard-t">High-frequency PYQ Topics</div>
+            <span class="tag t-p1">Monetary Policy</span><span class="tag t-p1">RBI Functions</span>
+            <span class="tag t-p2">Indian Economy</span><span class="tag t-p2">Budget &amp; Finance</span>
+            <span class="tag t-p3">Govt Schemes</span><span class="tag t-pyq">Current Affairs</span>
+            <span class="tag t-imp">Capital Markets</span><span class="tag t-imp">Banking Regulation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="input-area">
+      <div class="qp-row">
+        <span class="qp" onclick="askPYQ('Give me 3 MCQ PYQs on RBI Monetary Policy with answers and explanation')">🏦 Monetary Policy</span>
+        <span class="qp" onclick="askPYQ('PYQ questions on Indian Banking System and regulation')">🏛️ Banking</span>
+        <span class="qp" onclick="askPYQ('ESI descriptive questions on Indian Agriculture from past papers')">🌾 Agriculture ESI</span>
+        <span class="qp" onclick="askPYQ('Finance & Management PYQ questions with detailed answers')">📊 F&amp;M</span>
+        <span class="qp" onclick="askPYQ('Capital markets and SEBI related PYQ questions RBI Grade B')">📈 Capital Mkt</span>
+      </div>
+      <div class="inp-row">
+        <textarea class="inp" id="pyqInp" placeholder="Ask for PYQs on any topic…" rows="1"
+          onkeydown="hk(event,'pyq')" oninput="ar(this)"></textarea>
+        <button class="send" id="pyqBtn" onclick="sendPYQ()">➤</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── STATE ────────────────────────────────────────────────────────
+let uploadedFiles   = [];   // {name, type, text, size, base64, mediaType}
+let topicsDone      = JSON.parse(localStorage.getItem('rbi_done')    || '[]');
+let loggedTopics    = JSON.parse(localStorage.getItem('rbi_logged')  || '[]');
+let chatHistory     = [];
+let pyqHistory      = [];
+let busyChat=false, busyPYQ=false, busyAnalysis=false;
+
+const REV = [
+  {key:'r1',label:'Revision 1',  days:1,  badge:'r1'},
+  {key:'r2',label:'Revision 2',  days:7,  badge:'r2'},
+  {key:'r3',label:'Revision 3',  days:30, badge:'r3'},
+  {key:'r4',label:'Final Review',days:90, badge:'r4'},
+  {key:'mock',label:'Mock Test', days:120,badge:'mock'},
+];
+
+const SYLLABUS = {
+  ga:[
+    {n:'RBI — Functions, Structure & Policies',imp:'hi'},
+    {n:'Monetary Policy — Tools & Transmission',imp:'hi'},
+    {n:'Indian Banking System & RRBs',imp:'hi'},
+    {n:'Inflation — Types, Measurement, Control',imp:'hi'},
+    {n:'Union Budget & Economic Survey',imp:'hi'},
+    {n:'Capital Markets — SEBI, NSE, BSE',imp:'hi'},
+    {n:'Govt Schemes — Financial Inclusion',imp:'med'},
+    {n:'Balance of Payments & Forex',imp:'med'},
+    {n:'International Institutions — IMF, WB, WTO',imp:'med'},
+    {n:'Current Affairs — Last 6 months',imp:'hi'},
+    {n:'Indian Constitution — Economic Provisions',imp:'lo'},
+    {n:'Awards, Appointments, Summits',imp:'lo'},
+  ],
+  eng:[
+    {n:'Reading Comprehension',imp:'hi'},
+    {n:'Error Spotting & Correction',imp:'med'},
+    {n:'Para Jumbles',imp:'med'},
+    {n:'Fill in the Blanks',imp:'med'},
+    {n:'Vocabulary',imp:'lo'},
+  ],
+  quant:[
+    {n:'Data Interpretation — Tables, Charts',imp:'hi'},
+    {n:'Number Series',imp:'med'},
+    {n:'Simplification & Approximation',imp:'med'},
+    {n:'Percentage, Ratio, Proportion',imp:'med'},
+    {n:'Time, Speed, Work',imp:'lo'},
+    {n:'Profit, Loss, SI/CI',imp:'lo'},
+  ],
+  reason:[
+    {n:'Syllogism',imp:'hi'},
+    {n:'Puzzles & Seating Arrangement',imp:'hi'},
+    {n:'Coding-Decoding',imp:'med'},
+    {n:'Blood Relations & Direction',imp:'med'},
+    {n:'Input-Output',imp:'med'},
+    {n:'Statement-Assumption/Conclusion',imp:'med'},
+    {n:'Data Sufficiency',imp:'med'},
+  ],
+  esi:[
+    {n:'Indian Economy — Overview & Trends',imp:'hi'},
+    {n:'Agriculture — Issues, Reforms, MSP',imp:'hi'},
+    {n:'Poverty, Inequality & Employment',imp:'hi'},
+    {n:'Globalization & Economic Reforms',imp:'hi'},
+    {n:'Industry & Services Sector',imp:'med'},
+    {n:'Social Sector — Education, Health',imp:'med'},
+    {n:'Demographic Issues',imp:'med'},
+    {n:'Sustainable Development & Environment',imp:'med'},
+  ],
+  eng2:[
+    {n:'Essay Writing',imp:'hi'},
+    {n:'Precis Writing',imp:'hi'},
+    {n:'Comprehension Passages',imp:'med'},
+    {n:'Report Writing',imp:'med'},
+  ],
+  fm:[
+    {n:'Financial System — Structure & Regulators',imp:'hi'},
+    {n:'Fiscal Policy & Public Finance',imp:'hi'},
+    {n:'Capital & Money Markets',imp:'hi'},
+    {n:'Risk Management in Banking',imp:'hi'},
+    {n:'Basics of Finance — Valuation, NPV',imp:'med'},
+    {n:'Management — Theories & Concepts',imp:'med'},
+    {n:'Ethics & Corporate Governance',imp:'med'},
+    {n:'Leadership & Motivation',imp:'lo'},
+  ],
+};
+
+// ── SYSTEM PROMPT ────────────────────────────────────────────────
+function buildSystem(mode='chat') {
+  const today = new Date().toDateString();
+  const logged = loggedTopics.length
+    ? '\n\nLogged topics:\n'+loggedTopics.map(t=>`- ${t.name} (${t.studiedDate})`).join('\n') : '';
+
+  const hasNotes = uploadedFiles.length > 0;
+  const notesSummary = hasNotes
+    ? '\n\nUSER UPLOADED NOTES:\n'+uploadedFiles.map(f=>`[FILE: ${f.name}]\n${f.text.slice(0,4000)}`).join('\n\n---\n\n')
+    : '';
+
+  const notesInstruction = hasNotes
+    ? '\nIMPORTANT: The user has uploaded their study notes. ALWAYS reference their notes first when answering. Quote from their notes when relevant. Say "According to your notes..." when using their material.'
+    : '\nThe user has NOT uploaded notes yet. Encourage them to upload for personalized answers.';
+
+  const base = `You are an expert personal AI assistant for RBI Grade B Officer exam 2025. Today: ${today}.
+Exam: Phase I (Objective) + Phase II (Descriptive: ESI, English Writing, Finance & Management).${notesInstruction}${notesSummary}${logged}`;
+
+  if (mode === 'chat') return base + `
+
+BEHAVIOR:
+1. If user says "I studied [X]" or "I completed [X]" → respond ONLY with JSON: {"action":"log","topic":"<name>","advice":"<1 tip>"}
+2. For all other messages → answer helpfully using notes first, then your knowledge. Use bold for key terms, bullet points for lists. Always connect to exam relevance.`;
+
+  if (mode === 'pyq') return base + `
+For PYQ mode: Provide RBI Grade B style questions (MCQ with a/b/c/d options, or descriptive prompts for Phase II). Include correct answer, year if known, and explanation. If user has notes, flag when a question relates to their material with "📌 In your notes:"`;
+
+  if (mode === 'pyq_pattern') return base + `
+Analyse the user's uploaded notes against known RBI Grade B PYQ patterns (2015-2024). Output:
+1. Topics in notes that appear MOST frequently in past exams (ranked)
+2. Topics in notes that are RARELY asked (lower priority)
+3. Key PYQ topics NOT covered in notes
+Be specific, use the actual note content.`;
+
+  if (mode === 'gap_analysis') return base + `
+Compare the user's uploaded notes against the full RBI Grade B syllabus. Output a structured gap analysis:
+1. Topics WELL covered in notes ✅
+2. Topics PARTIALLY covered in notes ⚠️ (present but shallow)
+3. Topics MISSING from notes completely ❌ (critical gaps first)
+For each gap, state its exam importance (High/Medium/Low).`;
+
+  if (mode === 'revision_summary') return base + `
+Generate concise revision summaries from the user's notes. For each major topic found in the notes, create a bullet-point summary (5-8 bullets, exam-focused). Format clearly with topic headers.`;
+
+  if (mode === 'practice_questions') return base + `
+Generate 8-10 exam-style practice questions directly from the user's uploaded notes. Mix MCQ (with 4 options) and short-answer types. After each question, provide the answer referencing the relevant section of their notes. Make questions at RBI Grade B difficulty level.`;
+
+  return base;
+}
+
+// ── FILE HANDLING ────────────────────────────────────────────────
+function dzOver(e)  { e.preventDefault(); document.getElementById('dropzone').classList.add('over'); }
+function dzLeave(e) { document.getElementById('dropzone').classList.remove('over'); }
+function dzDrop(e)  { e.preventDefault(); dzLeave(e); handleFiles(e.dataTransfer.files); }
+
+async function handleFiles(files) {
+  for (const file of files) {
+    if (uploadedFiles.find(f => f.name === file.name)) continue;
+    const entry = { name: file.name, type: getFileType(file), text: '', size: file.size, status: 'processing', id: Date.now()+Math.random() };
+    uploadedFiles.push(entry);
+    renderFileList();
+    try {
+      await extractText(file, entry);
+      entry.status = 'ready';
+    } catch(e) {
+      entry.status = 'error';
+      entry.text = '';
+    }
+    renderFileList();
+    updateNotesPill();
+  }
+}
+
+function getFileType(file) {
+  const n = file.name.toLowerCase();
+  if (n.endsWith('.pdf')) return 'pdf';
+  if (n.endsWith('.docx')) return 'docx';
+  if (n.endsWith('.xlsx')||n.endsWith('.xls')) return 'excel';
+  if (n.endsWith('.txt')) return 'txt';
+  if (n.match(/\.(jpg|jpeg|png|webp)$/)) return 'image';
+  return 'unknown';
+}
+
+async function extractText(file, entry) {
+  if (entry.type === 'txt') {
+    entry.text = await file.text();
+  }
+  else if (entry.type === 'pdf') {
+    const ab = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+    let txt = '';
+    for (let i = 1; i <= Math.min(pdf.numPages, 60); i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      txt += content.items.map(s => s.str).join(' ') + '\n';
+    }
+    entry.text = txt.trim();
+  }
+  else if (entry.type === 'docx') {
+    const ab = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: ab });
+    entry.text = result.value;
+  }
+  else if (entry.type === 'excel') {
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab, { type: 'array' });
+    let txt = '';
+    wb.SheetNames.forEach(sn => {
+      txt += `Sheet: ${sn}\n`;
+      txt += XLSX.utils.sheet_to_csv(wb.Sheets[sn]) + '\n\n';
+    });
+    entry.text = txt;
+  }
+  else if (entry.type === 'image') {
+    // Store as base64 for vision API
+    const b64 = await toBase64(file);
+    entry.base64 = b64.split(',')[1];
+    entry.mediaType = file.type;
+    entry.text = '[IMAGE FILE — will be sent to AI vision for reading]';
+  }
+}
+
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+function renderFileList() {
+  const el = document.getElementById('fileList');
+  if (!uploadedFiles.length) { el.innerHTML=''; return; }
+  const icons = {pdf:'📄',docx:'📝',excel:'📊',txt:'📃',image:'🖼️',unknown:'📎'};
+  el.innerHTML = uploadedFiles.map(f => `
+    <div class="file-card">
+      <div class="file-icon">${icons[f.type]||'📎'}</div>
+      <div class="file-info">
+        <div class="file-name">${f.name}</div>
+        <div class="file-meta">${f.type.toUpperCase()} · ${(f.size/1024).toFixed(0)} KB${f.text?' · '+f.text.length.toLocaleString()+' chars':''}</div>
+      </div>
+      <span class="file-status ${f.status==='ready'?'fs-ready':f.status==='processing'?'fs-processing':'fs-error'}">
+        ${f.status==='ready'?'✓ Ready':f.status==='processing'?'⏳ Reading…':'✗ Error'}
+      </span>
+      <button class="file-del" onclick="deleteFile('${f.id}')">✕</button>
+    </div>`).join('');
+}
+
+function deleteFile(id) {
+  uploadedFiles = uploadedFiles.filter(f => String(f.id) !== String(id));
+  renderFileList();
+  updateNotesPill();
+}
+
+function updateNotesPill() {
+  const pill = document.getElementById('notesPill');
+  const ready = uploadedFiles.filter(f=>f.status==='ready').length;
+  if (ready > 0) { pill.textContent=`📄 ${ready} note${ready>1?'s':''} loaded`; pill.style.display='block'; }
+  else { pill.style.display='none'; }
+  renderSyllabus();
+}
+
+// ── ANALYSIS ─────────────────────────────────────────────────────
+async function runAnalysis(type) {
+  if (busyAnalysis) return;
+  const ready = uploadedFiles.filter(f=>f.status==='ready');
+  if (!ready.length) {
+    document.getElementById('analysisResult').innerHTML =
+      '<div class="result-box" style="color:var(--amber)">⚠️ Please upload your notes first before running analysis.</div>';
+    return;
+  }
+  busyAnalysis = true;
+
+  const titles = {
+    pyq_pattern:'Analysing PYQ patterns in your notes…',
+    gap_analysis:'Detecting syllabus gaps in your notes…',
+    revision_summary:'Generating revision summaries from your notes…',
+    practice_questions:'Creating practice questions from your notes…',
+  };
+  document.getElementById('analysisResult').innerHTML =
+    `<div class="result-box"><div class="dots"><span></span><span></span><span></span></div> ${titles[type]}</div>`;
+
+  try {
+    const messages = buildNotesMessages(type);
+    const res = await fetch('/api/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ messages, system:buildSystem(type) })
+    });
+    const data = await res.json();
+    const reply = data.text || '';
+    document.getElementById('analysisResult').innerHTML =
+      `<div class="result-box"><h3>${{pyq_pattern:'📈 PYQ Pattern Analysis',gap_analysis:'🕳️ Gap Analysis',revision_summary:'📋 Revision Summaries',practice_questions:'🎯 Practice Questions'}[type]}</h3>${fmt(reply)}</div>`;
+  } catch(e) {
+    document.getElementById('analysisResult').innerHTML = '<div class="result-box" style="color:var(--red)">⚠️ Error. Please try again.</div>';
+  }
+  busyAnalysis = false;
+}
+
+function buildNotesMessages(type) {
+  const prompts = {
+    pyq_pattern:'Analyse my uploaded notes against RBI Grade B PYQ patterns. Which topics in my notes appear most in past exams? Which are rarely asked? What important PYQ topics are missing from my notes?',
+    gap_analysis:'Compare my uploaded notes to the full RBI Grade B syllabus. Show me: ✅ well covered topics, ⚠️ partially covered topics, ❌ topics missing from my notes. Prioritise by exam importance.',
+    revision_summary:'Create concise revision summaries from my uploaded notes. For each major topic, give 5-8 exam-focused bullet points.',
+    practice_questions:'Generate 8-10 exam-style practice questions directly from my uploaded notes. Mix MCQ and short-answer. Include answers referencing my notes.',
+  };
+  const msgs = [{ role:'user', content: prompts[type] }];
+  // Add image files as vision content if any
+  const imageFiles = uploadedFiles.filter(f=>f.type==='image'&&f.base64);
+  if (imageFiles.length) {
+    const content = [{ type:'text', text: prompts[type] }];
+    imageFiles.forEach(f => content.push({ type:'image', source:{ type:'base64', media_type:f.mediaType, data:f.base64 }}));
+    msgs[0].content = content;
+  }
+  return msgs;
+}
+
+// ── CHAT ─────────────────────────────────────────────────────────
+function ar(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,110)+'px'; }
+function hk(e,mode) { if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); mode==='chat'?sendChat():sendPYQ(); }}
+function askQ(msg) { document.getElementById('chatInp').value=msg; sendChat(); }
+function askPYQ(msg) { document.getElementById('pyqInp').value=msg; sendPYQ(); switchTab('pyq'); }
+
+function appendMsg(role, html, wrapId) {
+  const area = document.getElementById(wrapId);
+  const d = document.createElement('div');
+  d.className = 'msg '+role;
+  d.innerHTML = `<div class="avatar ${role==='bot'?'bot':'usr'}">${role==='bot'?'RBI':'You'}</div><div class="bubble">${html}</div>`;
+  area.appendChild(d);
+  area.scrollTop = area.scrollHeight;
+  return d;
+}
+function showLoading(wrapId) { return appendMsg('bot','<div class="dots"><span></span><span></span><span></span></div>',wrapId); }
+
+function fmt(t) {
+  return t
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g,'<em>$1</em>')
+    .replace(/^#{1,3}\s(.+)/gm,'<strong style="display:block;margin-top:8px;color:var(--rbi)">$1</strong>')
+    .replace(/^[-•]\s(.+)/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)+/g,'<ul>$&</ul>')
+    .replace(/\n\n/g,'<br/><br/>')
+    .replace(/\n/g,'<br/>');
+}
+
+async function callAI(history, system, useWebSearch=false) {
+  const res = await fetch('/api/chat', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ messages:[...history], system, useWebSearch })
+  });
+  const d = await res.json();
+  if (d.text) return d.text;
+  throw new Error(d.error || 'No response');
+}
+
+async function sendChat() {
+  const inp = document.getElementById('chatInp');
+  const msg = inp.value.trim();
+  if (!msg||busyChat) return;
+  inp.value=''; inp.style.height='auto';
+  busyChat=true; document.getElementById('sendBtn').disabled=true;
+
+  const useWeb = document.getElementById('webSearchOn').checked;
+  appendMsg('user', msg, 'chatWrap');
+  chatHistory.push({ role:'user', content: msg });
+
+  // Show searching indicator if web is on
+  const searchIndicator = useWeb
+    ? appendMsg('bot','<div class="web-fetching">🌐 <span>Searching live RBI &amp; economy data…</span></div>','chatWrap')
+    : null;
+  if (!useWeb) showLoading('chatWrap');
+  const load = useWeb ? searchIndicator : document.querySelector('#chatWrap .msg.bot:last-child');
+
+  try {
+    const reply = await callAI(chatHistory, buildSystem('chat'), useWeb);
+    load.remove();
+    chatHistory.push({ role:'assistant', content: reply });
+
+    let parsed=null;
+    try { if(reply.trim().startsWith('{')) parsed=JSON.parse(reply.trim()); } catch(e){}
+
+    if (parsed?.action==='log') {
+      logTopic(parsed.topic, parsed.advice);
+    } else {
+      const webTag = useWeb ? '<span class="web-source">🌐 Live data used</span><br/>' : '';
+      appendMsg('bot', webTag + fmt(reply), 'chatWrap');
+    }
+  } catch(e) {
+    load.remove();
+    appendMsg('bot','⚠️ Connection error. Please try again.','chatWrap');
+  }
+  busyChat=false; document.getElementById('sendBtn').disabled=false;
+}
+
+async function sendPYQ() {
+  const inp = document.getElementById('pyqInp');
+  const msg = inp.value.trim();
+  if (!msg||busyPYQ) return;
+  inp.value=''; inp.style.height='auto';
+  busyPYQ=true; document.getElementById('pyqBtn').disabled=true;
+
+  appendMsg('user', msg, 'pyqWrap');
+  pyqHistory.push({ role:'user', content: msg });
+  const load = showLoading('pyqWrap');
+
+  try {
+    const reply = await callAI(pyqHistory, buildSystem('pyq'));
+    load.remove();
+    pyqHistory.push({ role:'assistant', content: reply });
+    appendMsg('bot', fmt(reply), 'pyqWrap');
+  } catch(e) {
+    load.remove();
+    appendMsg('bot','⚠️ Connection error. Please try again.','pyqWrap');
+  }
+  busyPYQ=false; document.getElementById('pyqBtn').disabled=false;
+}
+
+// ── LOG TOPIC + REVISION ──────────────────────────────────────────
+function logTopic(name, advice) {
+  const today = new Date();
+  const sessions = REV.map(s => ({ ...s, date: addDays(today,s.days) }));
+  const td = { name, studiedDate: fmtDate(today), sessions, id: Date.now() };
+  loggedTopics.push(td);
+  localStorage.setItem('rbi_logged', JSON.stringify(loggedTopics));
+
+  const rows = sessions.map(s=>`
+    <div style="display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid #e8eef8;font-size:.78rem">
+      <span class="tag ${s.badge==='mock'?'t-pyq':'t-p'+({'r1':3,'r2':1,'r3':2,'r4':3}[s.badge]||3)}" style="min-width:36px;text-align:center">${s.badge==='mock'?'MOCK':s.key.toUpperCase()}</span>
+      <span style="font-family:var(--mono);font-size:.73rem">${fmtDate(s.date)}</span>
+      <span style="color:var(--ink3);flex:1">${s.label}</span>
+    </div>`).join('');
+
+  appendMsg('bot', `
+    ✅ Logged: <strong>${name}</strong><br/>
+    <em style="font-size:.78rem;color:var(--ink3)">💡 ${advice}</em>
+    <div class="icard" style="margin-top:9px">
+      <div class="icard-t">📅 Your Revision Schedule</div>${rows}
+    </div>
+    <span style="font-size:.72rem;color:var(--green);font-family:var(--mono);display:block;margin-top:7px">✓ Check 📅 Revisions tab</span>
+  `, 'chatWrap');
+}
+
+// ── TRACKER ──────────────────────────────────────────────────────
+function renderTracker() {
+  const today=new Date(); today.setHours(0,0,0,0);
+  const week=new Date(today); week.setDate(week.getDate()+7);
+  let all=[];
+  loggedTopics.forEach(t=>(t.sessions||[]).forEach(s=>all.push({...s,topic:t.name,dateObj:new Date(s.date)})));
+  all.sort((a,b)=>a.dateObj-b.dateObj);
+  const dueWk=all.filter(s=>s.dateObj>=today&&s.dateObj<=week).length;
+  const mocks=all.filter(s=>s.key==='mock').length;
+  document.getElementById('trTopics').textContent=loggedTopics.length;
+  document.getElementById('trDue').textContent=dueWk;
+  document.getElementById('trDone').textContent=topicsDone.length;
+  document.getElementById('trMock').textContent=mocks;
+  const list=document.getElementById('revList');
+  const up=all.filter(s=>s.dateObj>=today).slice(0,15);
+  if(!up.length){list.innerHTML='<div class="empty">No upcoming revisions.<br/>Log a topic in the chat!</div>';return;}
+  list.innerHTML=up.map(s=>{
+    const diff=Math.ceil((s.dateObj-today)/(1000*60*60*24));
+    const dc=diff===0?'dot-today':diff<=3?'dot-soon':'dot-later';
+    const ds=diff===0?'TODAY':diff===1?'Tomorrow':fmtDate(s.dateObj);
+    return `<div class="rev-item">
+      <div class="rev-dot ${dc}"></div>
+      <span class="rev-topic">${s.topic}</span>
+      <span class="rev-type rt-${s.badge}">${s.badge==='mock'?'MOCK':s.key.toUpperCase()}</span>
+      <span class="rev-date">${ds}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── SYLLABUS ─────────────────────────────────────────────────────
+function renderSyllabus() {
+  const notesText = uploadedFiles.map(f=>f.text.toLowerCase()).join(' ');
+  Object.entries(SYLLABUS).forEach(([key,topics])=>{
+    const el=document.getElementById('tl-'+key);
+    if(!el)return;
+    el.innerHTML=topics.map((t,i)=>{
+      const id=key+'_'+i;
+      const done=topicsDone.includes(id);
+      const inNotes=notesText&&notesText.includes(t.n.toLowerCase().slice(0,12));
+      return `<div class="t-item" onclick="toggleT('${id}',this)">
+        <div class="chk ${done?'done':''}" id="chk-${id}">${done?'✓':''}</div>
+        <span class="t-name">${t.n}${inNotes?'<span class="t-notes-ind"> 📄</span>':''}</span>
+        <span class="t-imp ${t.imp}">${t.imp==='hi'?'High':t.imp==='med'?'Med':'Low'}</span>
+      </div>`;
+    }).join('');
+  });
+  updProg();
+}
+
+function toggleT(id) {
+  const i=topicsDone.indexOf(id);
+  if(i===-1)topicsDone.push(id); else topicsDone.splice(i,1);
+  localStorage.setItem('rbi_done',JSON.stringify(topicsDone));
+  const chk=document.getElementById('chk-'+id);
+  chk.classList.toggle('done',i===-1); chk.textContent=i===-1?'✓':'';
+  updProg();
+}
+
+function updProg() {
+  const total=Object.values(SYLLABUS).reduce((a,b)=>a+b.length,0);
+  const done=topicsDone.length;
+  const pct=Math.round(done/total*100);
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('doneC').textContent=done;
+  document.getElementById('remC').textContent=total-done;
+  document.getElementById('covP').textContent=pct+'%';
+}
+
+// ── LIVE WEB FETCH ────────────────────────────────────────────────
+const LIVE_QUERIES = {
+  rbi_circulars:   'Latest RBI circulars, notifications and press releases 2025. What are the most recent RBI policy decisions?',
+  current_affairs: 'Latest Indian economy current affairs March 2026 — GDP, inflation, budget, important for RBI Grade B exam',
+  key_rates:       'Current RBI policy rates 2025-2026: Repo Rate, Reverse Repo Rate, CRR, SLR, MSF Rate, Bank Rate. What are the latest values?',
+  exam_updates:    'RBI Grade B Officer exam 2025 2026 notification dates syllabus vacancy latest update',
+  banking_news:    'Latest Indian banking sector news 2025-2026 — NPA, bank mergers, RBI regulation changes relevant for exam',
+  govt_schemes:    'New Indian government schemes launched 2025-2026 relevant for RBI Grade B General Awareness section',
+};
+const LIVE_TITLES = {
+  rbi_circulars:  '🏦 RBI Circulars & Notifications',
+  current_affairs:'📰 Economy Current Affairs',
+  key_rates:      '📊 Key RBI Rates',
+  exam_updates:   '📋 RBI Grade B Exam Updates',
+  banking_news:   '🏛️ Banking Sector News',
+  govt_schemes:   '🗂️ New Govt Schemes',
+};
+
+let fetchingWeb = false;
+async function fetchLiveSection(type) {
+  if (fetchingWeb) return;
+  fetchingWeb = true;
+  const box = document.getElementById('webResults');
+  box.innerHTML = `<div class="web-fetching" style="padding:1rem">🌐 <span>Searching the web for "${LIVE_TITLES[type]}"…</span><div class="dots" style="margin-left:8px"><span></span><span></span><span></span></div></div>`;
+
+  const sys = `You are an RBI Grade B exam assistant. Search the web and provide a structured, exam-focused briefing. 
+Format your response with clear sections. For each piece of information, note its exam relevance. 
+Today is ${new Date().toDateString()}. Focus on information relevant to RBI Grade B 2025-26 exam preparation.
+Keep responses crisp and exam-relevant. No fluff.`;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ messages:[{ role:'user', content: LIVE_QUERIES[type] }], system: sys, useWebSearch: true })
+    });
+    const d = await res.json();
+    const text = d.text || '';
+
+    box.innerHTML = `
+      <div class="result-box">
+        <h3>${LIVE_TITLES[type]}</h3>
+        <div style="font-size:.68rem;font-family:var(--mono);color:var(--green);margin-bottom:10px">🌐 Live data · ${new Date().toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+        ${fmt(text)}
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
+          <span class="web-source" onclick="askQ('Based on the latest ${LIVE_TITLES[type]}, create 3 exam-style questions')">🎯 Make practice Qs</span>
+          <span class="web-source" onclick="askQ('Summarise the key points from ${LIVE_TITLES[type]} for quick revision')">📋 Quick summary</span>
+          <span class="refresh-btn" onclick="fetchLiveSection('${type}')">↻ Refresh</span>
+        </div>
+      </div>`;
+  } catch(e) {
+    box.innerHTML = '<div class="result-box" style="color:var(--red)">⚠️ Web search failed. Please try again.</div>';
+  }
+  fetchingWeb = false;
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────
+function fmtDate(d){return d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===id));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+id));
+  if(id==='tracker')renderTracker();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────
+renderSyllabus();
+</script>
+</body>
+</html>
